@@ -2,8 +2,9 @@ from fastapi import FastAPI, HTTPException
 import httpx
 from icalendar import Calendar
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
+import re
 
 app = FastAPI()
 
@@ -28,7 +29,103 @@ def get_week_parity(dt):
     return "неизвестно"
 
 
-@app.get("/hello")
+# Функция для извлечения корпуса из "location" (в скобках)
+def extract_building(location):
+    match = re.search(r'\((.*?)\)', location)
+    return match.group(1) if match else None
+
+
+# Функция для извлечения кампуса (первая буква перед "-")
+def extract_campus(location):
+    match = re.match(r'([А-ЯA-Z])-', location)
+    return match.group(1) if match else None
+
+
+# Поиск разных корпусов в один день
+def find_different_buildings(events):
+    issues = []
+    events_by_day = {}
+
+    for event in events:
+        key = (event["day_of_week"], event["week_parity"])
+        if key not in events_by_day:
+            events_by_day[key] = set()
+        building = extract_building(event["location"])
+        if building:
+            events_by_day[key].add(building)
+
+    for key, buildings in events_by_day.items():
+        if len(buildings) > 1:
+            issues.append({
+                "day": key[0],
+                "week_parity": key[1],
+                "buildings": list(buildings)
+            })
+
+    return issues
+
+
+# Поиск длинных перерывов (> 30 минут)
+def find_long_breaks(events):
+    issues = []
+    events_by_day = {}
+
+    for event in events:
+        key = (event["day_of_week"], event["week_parity"])
+        if key not in events_by_day:
+            events_by_day[key] = []
+        events_by_day[key].append(event)
+
+    for key, day_events in events_by_day.items():
+        day_events.sort(key=lambda e: e["start"])
+        for i in range(len(day_events) - 1):
+            end_time = datetime.strptime(day_events[i]["end"], "%H:%M")
+            start_time = datetime.strptime(day_events[i + 1]["start"], "%H:%M")
+            if start_time - end_time > timedelta(minutes=30):
+                issues.append({
+                    "day": key[0],
+                    "week_parity": key[1],
+                    "event1": day_events[i],
+                    "event2": day_events[i + 1],
+                    "break_time": (start_time - end_time).seconds // 60
+                })
+
+    return issues
+
+
+# Поиск короткой перемены (< 30 минут) с разными кампусами
+def find_short_breaks_different_campus(events):
+    issues = []
+    events_by_day = {}
+
+    for event in events:
+        key = (event["day_of_week"], event["week_parity"])
+        if key not in events_by_day:
+            events_by_day[key] = []
+        events_by_day[key].append(event)
+
+    for key, day_events in events_by_day.items():
+        day_events.sort(key=lambda e: e["start"])
+        for i in range(len(day_events) - 1):
+            end_time = datetime.strptime(day_events[i]["end"], "%H:%M")
+            start_time = datetime.strptime(day_events[i + 1]["start"], "%H:%M")
+            if start_time - end_time < timedelta(minutes=30):
+                campus1 = extract_campus(day_events[i]["location"])
+                campus2 = extract_campus(day_events[i + 1]["location"])
+                if campus1 and campus2 and campus1 != campus2:
+                    issues.append({
+                        "day": key[0],
+                        "week_parity": key[1],
+                        "event1": day_events[i],
+                        "event2": day_events[i + 1],
+                        "break_time": (start_time - end_time).seconds // 60,
+                        "different_campuses": (campus1, campus2)
+                    })
+
+    return issues
+
+
+@app.get("/schedule")
 async def get_schedule(query: str = None):
     search_url = "https://schedule-of.mirea.ru/schedule/api/search"
     params = {"match": query} if query else {}
@@ -62,7 +159,6 @@ async def get_schedule(query: str = None):
             end_dt = component.get("DTEND").dt
 
             if isinstance(start_dt, datetime) and isinstance(end_dt, datetime):
-                # Приводим к московскому времени
                 start_dt = start_dt.astimezone(pytz.timezone("Europe/Moscow"))
                 end_dt = end_dt.astimezone(pytz.timezone("Europe/Moscow"))
 
@@ -77,5 +173,15 @@ async def get_schedule(query: str = None):
                 }
                 events.append(event)
 
-    return {"calname": calname, "events": events}
+    different_buildings = find_different_buildings(events)
+    long_breaks = find_long_breaks(events)
+    short_breaks_different_campus = find_short_breaks_different_campus(events)
+
+    return {
+        "calname": calname,
+        "events": events,
+        "different_buildings": different_buildings,
+        "long_breaks": long_breaks,
+        "short_breaks_different_campus": short_breaks_different_campus
+    }
 
