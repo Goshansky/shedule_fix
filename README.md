@@ -11,5 +11,5 @@ This project provides a FastAPI application to fetch and process schedule data f
    
 3. Start the FastAPI server:
     ```sh
-    uvicorn app.main\:app --reload
+    uvicorn app.main:app --reload
 4. Access the API at http://127.0.0.1:8000/schedule
