@@ -41,6 +41,7 @@ async def fetch_all_events(query: str = None):
 
     return events_by_calname
 
+
 async def get_schedule(query: str = None):
     events_by_calname = await fetch_all_events(query)
     all_events = []
@@ -54,12 +55,14 @@ async def get_schedule(query: str = None):
         "short_breaks_different_campus": find_short_breaks_different_campus(all_events)
     }
 
+
 async def get_different_buildings(query: str = None):
     events_by_calname = await fetch_all_events(query)
     different_buildings_by_calname = {}
     for calname, events in events_by_calname.items():
         different_buildings_by_calname[calname] = find_different_buildings(events)
     return {"different_buildings": different_buildings_by_calname}
+
 
 async def get_long_breaks(query: str = None):
     events_by_calname = await fetch_all_events(query)
@@ -68,12 +71,14 @@ async def get_long_breaks(query: str = None):
         long_breaks_by_calname[calname] = find_long_breaks(events)
     return {"long_breaks": long_breaks_by_calname}
 
+
 async def get_short_breaks_different_campus(query: str = None):
     events_by_calname = await fetch_all_events(query)
     short_breaks_by_calname = {}
     for calname, events in events_by_calname.items():
         short_breaks_by_calname[calname] = find_short_breaks_different_campus(events)
     return {"short_breaks_different_campus": short_breaks_by_calname}
+
 
 def find_different_buildings(events):
     issues = []
@@ -106,6 +111,7 @@ def find_different_buildings(events):
 
     return issues
 
+
 def find_long_breaks(events):
     issues = []
     events_by_day = {}
@@ -131,6 +137,7 @@ def find_long_breaks(events):
                 })
 
     return issues
+
 
 def find_short_breaks_different_campus(events):
     issues = []

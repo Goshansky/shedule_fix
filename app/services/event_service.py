@@ -39,6 +39,7 @@ def process_events(calendar):
     }
 
 
+
 def find_different_buildings(events):
     issues = []
     events_by_day = {}

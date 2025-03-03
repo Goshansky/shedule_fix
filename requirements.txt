@@ -3,3 +3,4 @@ httpx
 icalendar
 pytz
 pydantic
+uvicorn
