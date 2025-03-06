@@ -2,10 +2,9 @@ import httpx
 from icalendar import Calendar
 from io import BytesIO
 from fastapi import HTTPException
-from app.services.event_service import process_events
+from app.services.event_service import process_events, find_short_breaks_different_campus, find_long_breaks, \
+    find_different_buildings
 from app.config.settings import SEARCH_URL
-from app.utils.string_utils import extract_campus, extract_building
-from datetime import datetime, timedelta
 
 
 async def fetch_all_events(query: str = None):
@@ -78,94 +77,4 @@ async def get_short_breaks_different_campus(query: str = None):
     for calname, events in events_by_calname.items():
         short_breaks_by_calname[calname] = find_short_breaks_different_campus(events)
     return {"short_breaks_different_campus": short_breaks_by_calname}
-
-
-def find_different_buildings(events):
-    issues = []
-    events_by_day = {}
-
-    for event in events:
-        key = (event.day_of_week, event.week_parity)
-        if key not in events_by_day:
-            events_by_day[key] = []
-        events_by_day[key].append(event)
-
-    for key, day_events in events_by_day.items():
-        buildings = set()
-        events_by_building = {}
-        for event in day_events:
-            building = extract_building(event.location)
-            if building:
-                buildings.add(building)
-                if building not in events_by_building:
-                    events_by_building[building] = []
-                events_by_building[building].append(event)
-
-        if len(buildings) > 1:
-            issues.append({
-                "day": key[0],
-                "week_parity": key[1],
-                "buildings": list(buildings),
-                "events_by_building": events_by_building
-            })
-
-    return issues
-
-
-def find_long_breaks(events):
-    issues = []
-    events_by_day = {}
-
-    for event in events:
-        key = (event.day_of_week, event.week_parity)
-        if key not in events_by_day:
-            events_by_day[key] = []
-        events_by_day[key].append(event)
-
-    for key, day_events in events_by_day.items():
-        day_events.sort(key=lambda e: e.start)
-        for i in range(len(day_events) - 1):
-            end_time = datetime.strptime(day_events[i].end, "%H:%M")
-            start_time = datetime.strptime(day_events[i + 1].start, "%H:%M")
-            if start_time - end_time > timedelta(minutes=30):
-                issues.append({
-                    "day": key[0],
-                    "week_parity": key[1],
-                    "event1": day_events[i],
-                    "event2": day_events[i + 1],
-                    "break_time": (start_time - end_time).seconds // 60
-                })
-
-    return issues
-
-
-def find_short_breaks_different_campus(events):
-    issues = []
-    events_by_day = {}
-
-    for event in events:
-        key = (event.day_of_week, event.week_parity)
-        if key not in events_by_day:
-            events_by_day[key] = []
-        events_by_day[key].append(event)
-
-    for key, day_events in events_by_day.items():
-        day_events.sort(key=lambda e: e.start)
-        for i in range(len(day_events) - 1):
-            end_time = datetime.strptime(day_events[i].end, "%H:%M")
-            start_time = datetime.strptime(day_events[i + 1].start, "%H:%M")
-            if start_time - end_time < timedelta(minutes=30):
-                campus1 = extract_campus(day_events[i].location)
-                campus2 = extract_campus(day_events[i + 1].location)
-                if campus1 and campus2 and campus1 != campus2:
-                    issues.append({
-                        "day": key[0],
-                        "week_parity": key[1],
-                        "event1": day_events[i],
-                        "event2": day_events[i + 1],
-                        "break_time": (start_time - end_time).seconds // 60,
-                        "different_campuses": (campus1, campus2)
-                    })
-
-    return issues
 
