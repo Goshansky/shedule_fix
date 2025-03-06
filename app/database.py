@@ -9,23 +9,66 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+def get_history_by_text(db, text):
+    return db.query(History).filter(History.text == text).first()
+
+
+def get_group_by_name(db, name):
+    return db.query(Group).filter(Group.name == name).first()
+
+
+def get_events_by_group_id(db, group_id):
+    return db.query(Event).filter(Event.groups_id == group_id).all()
+
+
+def get_long_breaks_by_group_id(db, group_id):
+    return db.query(LongBreak).filter(LongBreak.groups_id == group_id).all()
+
+
+def get_short_breaks_by_group_id(db, group_id):
+    return db.query(ShortBreak).filter(ShortBreak.groups_id == group_id).all()
+
+
+def get_different_buildings_by_group_id(db, group_id):
+    return db.query(DifferentBuilding).filter(DifferentBuilding.groups_id == group_id).all()
+
+
+def get_events_db_by_different_building_id(db, different_building_id):
+    return db.query(EventDB).filter(EventDB.different_buildings_id == different_building_id).all()
+
+
+def get_events_lb_by_long_break_id(db, long_break_id):
+    return db.query(EventLB).filter(EventLB.long_breaks_id == long_break_id).all()
+
+
+def get_events_sb_by_short_break_id(db, short_break_id):
+    return db.query(EventSB).filter(EventSB.short_breaks_id == short_break_id).all()
+
+
 class Group(Base):
     __tablename__ = 'groups'
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
 
+    def to_dict(self):
+        return {
+            "name": self.name
+        }
 
 class History(Base):
     __tablename__ = 'histories'
     id = Column(Integer, primary_key=True, index=True)
     text = Column(String, index=True)
 
+    def to_dict(self):
+        return {
+            "text": self.text
+        }
 
 class HistoryHasGroup(Base):
     __tablename__ = 'history_has_groups'
     history_id = Column(Integer, ForeignKey('histories.id'), primary_key=True)
     group_id = Column(Integer, ForeignKey('groups.id'), primary_key=True)
-
 
 class Event(Base):
     __tablename__ = 'events'
@@ -39,6 +82,16 @@ class Event(Base):
     week_parity = Column(String, index=True)
     groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "summary": self.summary,
+            "start": self.start_time,
+            "end": self.end_time,
+            "day_of_week": self.day_of_week,
+            "description": self.description,
+            "location": self.location,
+            "week_parity": self.week_parity
+        }
 
 class LongBreak(Base):
     __tablename__ = 'long_breaks'
@@ -48,6 +101,12 @@ class LongBreak(Base):
     breaktime = Column(Integer, index=True)
     groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "day": self.day,
+            "week_parity": self.week_parity,
+            "break_time": self.breaktime
+        }
 
 class ShortBreak(Base):
     __tablename__ = 'short_breaks'
@@ -57,6 +116,12 @@ class ShortBreak(Base):
     breaktime = Column(Integer, index=True)
     groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "day": self.day,
+            "week_parity": self.week_parity,
+            "break_time": self.breaktime
+        }
 
 class DifferentBuilding(Base):
     __tablename__ = 'different_buildings'
@@ -65,6 +130,11 @@ class DifferentBuilding(Base):
     week_parity = Column(String, index=True)
     groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "day": self.day,
+            "week_parity": self.week_parity
+        }
 
 class EventDB(Base):
     __tablename__ = 'events_db'
@@ -79,6 +149,16 @@ class EventDB(Base):
     different_buildings_id = Column(Integer, ForeignKey('different_buildings.id'))
     different_buildings_groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "summary": self.summary,
+            "start": self.start_time,
+            "end": self.end_time,
+            "day_of_week": self.day_of_week,
+            "description": self.description,
+            "location": self.location,
+            "week_parity": self.week_parity
+        }
 
 class EventLB(Base):
     __tablename__ = 'events_lb'
@@ -93,6 +173,16 @@ class EventLB(Base):
     long_breaks_id = Column(Integer, ForeignKey('long_breaks.id'))
     long_breaks_groups_id = Column(Integer, ForeignKey('groups.id'))
 
+    def to_dict(self):
+        return {
+            "summary": self.summary,
+            "start": self.start_time,
+            "end": self.end_time,
+            "day_of_week": self.day_of_week,
+            "description": self.description,
+            "location": self.location,
+            "week_parity": self.week_parity
+        }
 
 class EventSB(Base):
     __tablename__ = 'events_sb'
@@ -106,6 +196,17 @@ class EventSB(Base):
     week_parity = Column(String, index=True)
     short_breaks_id = Column(Integer, ForeignKey('short_breaks.id'))
     short_breaks_groups_id = Column(Integer, ForeignKey('groups.id'))
+
+    def to_dict(self):
+        return {
+            "summary": self.summary,
+            "start": self.start_time,
+            "end": self.end_time,
+            "day_of_week": self.day_of_week,
+            "description": self.description,
+            "location": self.location,
+            "week_parity": self.week_parity
+        }
 
 
 Base.metadata.create_all(bind=engine)

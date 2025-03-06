@@ -1,11 +1,10 @@
-from fastapi import FastAPI
-
 from app.database import add_history, add_group, HistoryHasGroup, add_event, add_long_break, add_short_break, \
-    add_different_building, SessionLocal
+    add_different_building, SessionLocal, Group, get_history_by_text, get_events_by_group_id, get_long_breaks_by_group_id, \
+    get_short_breaks_by_group_id, get_different_buildings_by_group_id, get_events_lb_by_long_break_id, \
+    get_events_sb_by_short_break_id, get_events_db_by_different_building_id, get_group_by_name
 from app.services.schedule_service import get_schedule, get_different_buildings, get_long_breaks, get_short_breaks_different_campus
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from typing import List
 app = FastAPI()
 
 
@@ -19,6 +18,117 @@ def get_db():
 
 @app.get("/schedule")
 async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
+    # Проверяем, был ли выполнен такой запрос ранее
+    history = get_history_by_text(db, query)
+    if history:
+        print("1")
+        # Возвращаем данные из базы данных
+        group = db.query(Group).filter(Group.id == history.id).first()
+        events = get_events_by_group_id(db, group.id)
+        long_breaks = get_long_breaks_by_group_id(db, group.id)
+        short_breaks = get_short_breaks_by_group_id(db, group.id)
+        different_buildings = get_different_buildings_by_group_id(db, group.id)
+
+        # Добавляем вложенные события
+        for long_break in long_breaks:
+            long_break.events = get_events_lb_by_long_break_id(db, long_break.id)
+
+        for short_break in short_breaks:
+            short_break.events = get_events_sb_by_short_break_id(db, short_break.id)
+
+        for different_building in different_buildings:
+            different_building.events = get_events_db_by_different_building_id(db, different_building.id)
+
+        return {
+            "events_by_calname": {group.name: [event.to_dict() for event in events]},
+            "different_buildings": [
+                {
+                    "day": db.day,
+                    "week_parity": db.week_parity,
+                    "buildings": list(set(event.location[event.location.find("(")+1:-1] for event in db.events)),
+                    "events_by_building": [{list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i]: [event for event in db.events if list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i] in event.location]}
+                    for i in range(len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
+                }
+                for db in different_buildings
+            ],
+            "long_breaks": [
+                {
+                    "day": lb.day,
+                    "week_parity": lb.week_parity,
+                    "break_time": lb.breaktime,
+                    "event1": lb.events[0].to_dict(),
+                    "event2": lb.events[1].to_dict()
+                }
+                for lb in long_breaks
+            ],
+            "short_breaks_different_campus": [
+                {
+                    "day": sb.day,
+                    "week_parity": sb.week_parity,
+                    "break_time": sb.breaktime,
+                    "event1": sb.events[0].to_dict(),
+                    "event2": sb.events[1].to_dict(),
+                    "different_campuses": [sb.events[0].location[0], sb.events[1].location[0]]
+                }
+                for sb in short_breaks
+            ]
+        }
+
+    # Проверяем наличие группы в таблице groups
+    group = get_group_by_name(db, query)
+    if group:
+        print("2")
+        # Возвращаем данные из базы данных
+        events = get_events_by_group_id(db, group.id)
+        long_breaks = get_long_breaks_by_group_id(db, group.id)
+        short_breaks = get_short_breaks_by_group_id(db, group.id)
+        different_buildings = get_different_buildings_by_group_id(db, group.id)
+
+        # Добавляем вложенные события
+        for long_break in long_breaks:
+            long_break.events = get_events_lb_by_long_break_id(db, long_break.id)
+
+        for short_break in short_breaks:
+            short_break.events = get_events_sb_by_short_break_id(db, short_break.id)
+
+        for different_building in different_buildings:
+            different_building.events = get_events_db_by_different_building_id(db, different_building.id)
+
+        return {
+            "events_by_calname": {group.name: [event.to_dict() for event in events]},
+            "different_buildings": [
+                {
+                    "day": db.day,
+                    "week_parity": db.week_parity,
+                    "buildings": list(set(event.location[event.location.find("(")+1:-1] for event in db.events)),
+                    "events_by_building": {building: [event.to_dict() for event in events] for building, events in db.events_by_building.items()}
+                }
+                for db in different_buildings
+            ],
+            "long_breaks": [
+                {
+                    "day": lb.day,
+                    "week_parity": lb.week_parity,
+                    "break_time": lb.breaktime,
+                    "event1": lb.events[0].to_dict(),
+                    "event2": lb.events[1].to_dict()
+                }
+                for lb in long_breaks
+            ],
+            "short_breaks_different_campus": [
+                {
+                    "day": sb.day,
+                    "week_parity": sb.week_parity,
+                    "break_time": sb.breaktime,
+                    "event1": sb.events[0].to_dict(),
+                    "event2": sb.events[1].to_dict(),
+                    "different_campuses": [sb.events[0].location[0], sb.events[1].location[0]]
+                }
+                for sb in short_breaks
+            ]
+        }
+    print("222")
+    # Отправляем запрос на API и сохраняем результаты в базу данных
     response = await get_schedule(query)
 
     # Сохраняем историю запроса
