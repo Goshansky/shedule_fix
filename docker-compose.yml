@@ -8,3 +8,24 @@ services:
     volumes:
       - .:/app
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  db:
+    image: postgres:13
+    container_name: schedule_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: schedule
+#    volumes:
+#      # "./migrations/init.sql" - путь к миграциям БД
+#      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5431:5432"
+#    healthcheck:
+#      test: [ "CMD-SHELL", "sh -c 'pg_isready -U postgres -d schedule'" ]
+#      interval: 5s
+#      timeout: 10s
+#      retries: 5
+#      start_period: 10s
+#    networks:
+#      - internal
