@@ -159,10 +159,23 @@ async def different_buildings_endpoint(query: str = None, db: Session = Depends(
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
+        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
         db.commit()
+
+        # Сохраняем события
+        for event in data[calname]['events_by_calname']:
+            add_event(db, event, group.id)
+
+        # Сохраняем длинные перерывы
+        for long_break in data[calname]['long_breaks']:
+            add_long_break(db, long_break, group.id)
+
+        # Сохраняем короткие перерывы
+        for short_break in data[calname]['short_breaks_different_campus']:
+            add_short_break(db, short_break, group.id)
 
         # Сохраняем разные здания
         for different_building in data[calname]['different_buildings']:
@@ -209,14 +222,27 @@ async def long_breaks_endpoint(query: str = None, db: Session = Depends(get_db))
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
+        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
         db.commit()
 
+        # Сохраняем события
+        for event in data[calname]['events_by_calname']:
+            add_event(db, event, group.id)
+
         # Сохраняем длинные перерывы
         for long_break in data[calname]['long_breaks']:
             add_long_break(db, long_break, group.id)
+
+        # Сохраняем короткие перерывы
+        for short_break in data[calname]['short_breaks_different_campus']:
+            add_short_break(db, short_break, group.id)
+
+        # Сохраняем разные здания
+        for different_building in data[calname]['different_buildings']:
+            add_different_building(db, different_building, group.id)
 
     return await get_long_breaks(query)
 
@@ -260,13 +286,26 @@ async def short_breaks_different_campus_endpoint(query: str = None, db: Session 
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
+        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
         db.commit()
 
+        # Сохраняем события
+        for event in data[calname]['events_by_calname']:
+            add_event(db, event, group.id)
+
+        # Сохраняем длинные перерывы
+        for long_break in data[calname]['long_breaks']:
+            add_long_break(db, long_break, group.id)
+
         # Сохраняем короткие перерывы
         for short_break in data[calname]['short_breaks_different_campus']:
             add_short_break(db, short_break, group.id)
+
+        # Сохраняем разные здания
+        for different_building in data[calname]['different_buildings']:
+            add_different_building(db, different_building, group.id)
 
     return await get_short_breaks_different_campus(query)
