@@ -1,10 +1,19 @@
+import json
+from uuid import uuid4
+import asyncio
+from pydantic import BaseModel
+from datetime import datetime
+
 from app.database import add_history, add_group, HistoryHasGroup, add_event, add_long_break, add_short_break, \
-    add_different_building, SessionLocal, Group, get_history_by_text, get_events_by_group_id, get_long_breaks_by_group_id, \
+    add_different_building, SessionLocal, Group, get_history_by_text, get_events_by_group_id, \
+    get_long_breaks_by_group_id, \
     get_short_breaks_by_group_id, get_different_buildings_by_group_id, get_events_lb_by_long_break_id, \
-    get_events_sb_by_short_break_id, get_events_db_by_different_building_id, get_group_by_name
-from app.services.schedule_service import get_schedule, get_different_buildings, get_long_breaks, get_short_breaks_different_campus
-from fastapi import FastAPI, Depends
+    get_events_sb_by_short_break_id, get_events_db_by_different_building_id, get_group_by_name, RequestStatus
+from app.services.schedule_service import get_schedule, get_different_buildings, get_long_breaks, \
+    get_short_breaks_different_campus
+from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
+
 app = FastAPI()
 
 
@@ -38,7 +47,7 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
             short_breaks = get_short_breaks_by_group_id(db, group.id)
             different_buildings = get_different_buildings_by_group_id(db, group.id)
 
-        # Добавляем вложенные события
+            # Добавляем вложенные события
             for long_break in long_breaks:
                 long_break.events = get_events_lb_by_long_break_id(db, long_break.id)
 
@@ -49,42 +58,48 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
                 different_building.events = get_events_db_by_different_building_id(db, different_building.id)
 
             response.append({
-            "events_by_calname": {group.name: [event.to_dict() for event in events]},
-            "different_buildings": [
-                {
-                    "day": db.day,
-                    "week_parity": db.week_parity,
-                    "buildings": list(set(event.location[event.location.find("(")+1:-1] for event in db.events)),
-                    "events_by_building": [{list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i]: [event for event in db.events if list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i] in event.location]}
-                    for i in range(len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
-                }
-                for db in different_buildings
-            ],
-            "long_breaks": [
-                {
-                    "day": lb.day,
-                    "week_parity": lb.week_parity,
-                    "break_time": lb.breaktime,
-                    "event1": lb.events[0].to_dict(),
-                    "event2": lb.events[1].to_dict()
-                }
-                for lb in long_breaks
-            ],
-            "short_breaks_different_campus": [
-                {
-                    "day": sb.day,
-                    "week_parity": sb.week_parity,
-                    "break_time": sb.breaktime,
-                    "event1": sb.events[0].to_dict(),
-                    "event2": sb.events[1].to_dict(),
-                    "different_campuses": [sb.events[0].location[0], sb.events[1].location[0]]
-                }
-                for sb in short_breaks
-            ]
-        })
+                "events_by_calname": {group.name: [event.to_dict() for event in events]},
+                "different_buildings": [
+                    {
+                        "day": db.day,
+                        "week_parity": db.week_parity,
+                        "buildings": list(set(event.location[event.location.find("(") + 1:-1] for event in db.events)),
+                        "events_by_building": [{list(
+                            set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]: [event for
+                                                                                                              event in
+                                                                                                              db.events
+                                                                                                              if list(
+                                set(event.location[event.location.find("(") + 1:-1] for event in db.events))[
+                                                                                                                  i] in event.location]}
+                                               for i in range(
+                                len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
+                    }
+                    for db in different_buildings
+                ],
+                "long_breaks": [
+                    {
+                        "day": lb.day,
+                        "week_parity": lb.week_parity,
+                        "break_time": lb.breaktime,
+                        "event1": lb.events[0].to_dict(),
+                        "event2": lb.events[1].to_dict()
+                    }
+                    for lb in long_breaks
+                ],
+                "short_breaks_different_campus": [
+                    {
+                        "day": sb.day,
+                        "week_parity": sb.week_parity,
+                        "break_time": sb.breaktime,
+                        "event1": sb.events[0].to_dict(),
+                        "event2": sb.events[1].to_dict(),
+                        "different_campuses": [sb.events[0].location[0], sb.events[1].location[0]]
+                    }
+                    for sb in short_breaks
+                ]
+            })
 
         return response
-
 
     # Отправляем запрос на API и сохраняем результаты в базу данных
     # Отправляем запрос на API и сохраняем результаты в базу данных
@@ -140,9 +155,27 @@ async def different_buildings_endpoint(query: str = None, db: Session = Depends(
                         {
                             "day": db.day,
                             "week_parity": db.week_parity,
-                            "buildings": list(set(event.location[event.location.find("(")+1:-1] for event in db.events)),
-                            "events_by_building": [{list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i]: [event for event in db.events if list(set(event.location[event.location.find("(")+1:-1] for event in db.events))[i] in event.location]}
-                            for i in range(len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
+                            "buildings": list(
+                                set(event.location[event.location.find("(") + 1:-1] for event in db.events)),
+                            "events_by_building": [{list(
+                                set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]: [event
+                                                                                                                  for
+                                                                                                                  event
+                                                                                                                  in
+                                                                                                                  db.events
+                                                                                                                  if
+                                                                                                                  list(
+                                                                                                                      set(
+                                                                                                                          event.location[
+                                                                                                                          event.location.find(
+                                                                                                                              "(") + 1:-1]
+                                                                                                                          for
+                                                                                                                          event
+                                                                                                                          in
+                                                                                                                          db.events))[
+                                                                                                                      i] in event.location]}
+                                                   for i in range(len(list(
+                                    set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
                         }
                         for db in different_buildings
                     ]
@@ -309,3 +342,77 @@ async def short_breaks_different_campus_endpoint(query: str = None, db: Session 
             add_different_building(db, different_building, group.id)
 
     return await get_short_breaks_different_campus(query)
+
+
+async def process_request(query: str, request_id: int):
+    """Фоновая обработка запроса."""
+    try:
+        # Получаем результат (предполагаем, что get_schedule — async)
+        result = await get_schedule(query)
+
+        # Функция для сериализации в JSON-совместимый формат
+        def to_dict(obj):
+            if isinstance(obj, list):
+                return [to_dict(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {key: to_dict(value) for key, value in obj.items()}
+            elif hasattr(obj, 'to_dict'):  # Если есть метод `to_dict()`
+                return obj.to_dict()
+            elif hasattr(obj, '__dict__'):  # Если это объект класса (SQLAlchemy)
+                return {key: to_dict(value) for key, value in obj.__dict__.items() if not key.startswith('_')}
+            elif isinstance(obj, datetime):  # Даты сериализуем в строку
+                return obj.isoformat()
+            else:
+                return obj
+
+        result_dict = [event.dict() if hasattr(event, 'dict') else to_dict(event) for event in result]
+
+
+        # Открываем новую сессию БД
+        with next(get_db()) as db:
+            request_status = db.query(RequestStatus).filter(RequestStatus.id == request_id).first()
+            if request_status:
+                request_status.status = "completed"
+                request_status.result = json.dumps(result_dict)  # Сериализуем в JSON
+                db.commit()
+            else:
+                print(f"Request {request_id} not found.")
+    except Exception as e:
+        print(f"Error processing request {request_id}: {e}")
+        with next(get_db()) as db:
+            request_status = db.query(RequestStatus).filter(RequestStatus.id == request_id).first()
+            if request_status:
+                request_status.status = "failed"
+                request_status.result = json.dumps({"error": str(e)})
+                db.commit()
+
+
+class RequestCreate(BaseModel):
+    query: str
+
+
+@app.post("/schedule")
+async def schedule_endpoint(request: RequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Создает новый запрос и запускает обработку в фоне."""
+    request_status = RequestStatus(query_text=request.query, status="in_progress")
+    db.add(request_status)
+    db.commit()
+    db.refresh(request_status)
+
+    # Запускаем фоновую задачу через asyncio.create_task()
+    background_tasks.add_task(process_request, request.query, request_status.id)
+
+    return {"request_id": request_status.id}
+
+
+@app.get("/status/{request_id}")
+async def get_request_status(request_id: int, db: Session = Depends(get_db)):
+    """Возвращает статус и результат запроса."""
+    request_status = db.query(RequestStatus).filter(RequestStatus.id == request_id).first()
+    if not request_status:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    return {
+        "status": request_status.status,
+        "result": json.loads(request_status.result) if request_status.status == "completed" else None
+    }

@@ -1,6 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, JSON, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import Session
+
+from app.services.schedule_service import get_schedule
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = "postgresql://postgres:password@localhost:5431/schedule"
 
@@ -8,6 +15,14 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
+class RequestStatus(Base):
+    __tablename__ = "request_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+    query_text = Column(String, index=True)
+    status = Column(String, default="in_progress")  # in_progress, completed
+    result = Column(JSON, nullable=True)  # если запрос завершен, сюда можно сохранить результат
 
 def get_history_by_text(db, text):
     return db.query(History).filter(History.text == text).first()
