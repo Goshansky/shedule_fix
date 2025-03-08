@@ -43,16 +43,19 @@ async def fetch_all_events(query: str = None):
 
 async def get_schedule(query: str = None):
     events_by_calname = await fetch_all_events(query)
-    all_events = []
-    for events in events_by_calname.values():
-        all_events.extend(events)
+    schedule_data = []
 
-    return {
-        "events_by_calname": events_by_calname,
-        "different_buildings": find_different_buildings(all_events),
-        "long_breaks": find_long_breaks(all_events),
-        "short_breaks_different_campus": find_short_breaks_different_campus(all_events)
-    }
+    for calname, events in events_by_calname.items():
+        schedule_data.append({
+            calname: {
+                "events_by_calname": events,
+                "different_buildings": find_different_buildings(events),
+                "long_breaks": find_long_breaks(events),
+                "short_breaks_different_campus": find_short_breaks_different_campus(events)
+            }
+        })
+
+    return schedule_data
 
 
 async def get_different_buildings(query: str = None):
