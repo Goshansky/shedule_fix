@@ -5,3 +5,4 @@ pytz~=2025.1
 pydantic~=2.10.6
 uvicorn
 SQLAlchemy~=2.0.38
+psycopg2-binary
