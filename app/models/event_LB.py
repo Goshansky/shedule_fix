@@ -1,10 +1,9 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, JSON, text
 from app.database import Base
+from sqlalchemy import Column, Integer, String, ForeignKey
 
 
-class Event(Base):
-    __tablename__ = 'events'
+class EventLB(Base):
+    __tablename__ = 'events_lb'
     id = Column(Integer, primary_key=True, index=True)
     summary = Column(String, index=True)
     start_time = Column(String, index=True)
@@ -13,7 +12,8 @@ class Event(Base):
     description = Column(String, index=True)
     location = Column(String, index=True)
     week_parity = Column(String, index=True)
-    groups_id = Column(Integer, ForeignKey('groups.id'))
+    long_breaks_id = Column(Integer, ForeignKey('long_breaks.id'))
+    long_breaks_groups_id = Column(Integer, ForeignKey('groups.id'))
 
     def to_dict(self):
         return {

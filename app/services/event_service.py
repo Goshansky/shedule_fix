@@ -1,4 +1,4 @@
-from app.models.event import Event
+from app.models.events import Event
 from app.utils.date_utils import format_time, get_week_parity, DAYS_OF_WEEK
 from app.utils.string_utils import extract_building, extract_campus
 from datetime import datetime, timedelta

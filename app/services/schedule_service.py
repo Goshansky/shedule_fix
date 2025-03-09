@@ -80,4 +80,3 @@ async def get_short_breaks_different_campus(query: str = None):
     for calname, events in events_by_calname.items():
         short_breaks_by_calname[calname] = find_short_breaks_different_campus(events)
     return {"short_breaks_different_campus": short_breaks_by_calname}
-
