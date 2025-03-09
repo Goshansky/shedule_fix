@@ -1,6 +1,4 @@
 import json
-from uuid import uuid4
-import asyncio
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -8,7 +6,7 @@ from app.database import add_history, add_group, HistoryHasGroup, add_event, add
     add_different_building, SessionLocal, Group, get_history_by_text, get_events_by_group_id, \
     get_long_breaks_by_group_id, \
     get_short_breaks_by_group_id, get_different_buildings_by_group_id, get_events_lb_by_long_break_id, \
-    get_events_sb_by_short_break_id, get_events_db_by_different_building_id, get_group_by_name, RequestStatus
+    get_events_sb_by_short_break_id, get_events_db_by_different_building_id, RequestStatus
 from app.services.schedule_service import get_schedule, get_different_buildings, get_long_breaks, \
     get_short_breaks_different_campus
 from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
@@ -25,23 +23,38 @@ def get_db():
         db.close()
 
 
-# @app.get("/schedule")
-# async def schedule_endpoint(query: str = None):
-#     return await get_schedule(query)
+# level 1
+@app.get("/schedule_1")
+async def schedule_endpoint(query: str = None):
+    return await get_schedule(query)
 
-@app.get("/schedule")
+
+@app.get("/different-buildings_1")
+async def different_buildings_endpoint(query: str = None):
+    return await get_different_buildings(query)
+
+
+@app.get("/long-breaks_1")
+async def long_breaks_endpoint(query: str = None):
+    return await get_long_breaks(query)
+
+
+@app.get("/short-breaks-different-campus_1")
+async def short_breaks_different_campus_endpoint(query: str = None):
+    return await get_short_breaks_different_campus(query)
+
+
+# level_2
+@app.get("/schedule_2")
 async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
     # Проверяем, был ли выполнен такой запрос ранее
     history = get_history_by_text(db, query)
-    print(query)
     if history:
-        print("1")
         # Возвращаем данные из базы данных
         group_has_histories = db.query(HistoryHasGroup).filter(HistoryHasGroup.history_id == history.id).all()
         response = []
         for ghh in group_has_histories:
             group = db.query(Group).filter(Group.id == ghh.group_id).first()
-            print(group.id)
             events = get_events_by_group_id(db, group.id)
             long_breaks = get_long_breaks_by_group_id(db, group.id)
             short_breaks = get_short_breaks_by_group_id(db, group.id)
@@ -64,15 +77,9 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
                         "day": db.day,
                         "week_parity": db.week_parity,
                         "buildings": list(set(event.location[event.location.find("(") + 1:-1] for event in db.events)),
-                        "events_by_building": [{list(
-                            set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]: [event for
-                                                                                                              event in
-                                                                                                              db.events
-                                                                                                              if list(
-                                set(event.location[event.location.find("(") + 1:-1] for event in db.events))[
-                                                                                                                  i] in event.location]}
-                                               for i in range(
-                                len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
+                        "events_by_building": [{list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]:
+                                [event for event in db.events if list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i] in event.location]}
+                                for i in range(len(list(set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
                     }
                     for db in different_buildings
                 ],
@@ -102,7 +109,6 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
         return response
 
     # Отправляем запрос на API и сохраняем результаты в базу данных
-    # Отправляем запрос на API и сохраняем результаты в базу данных
     response = await get_schedule(query)
 
     # Сохраняем историю запроса
@@ -111,7 +117,6 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
-        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
@@ -136,7 +141,7 @@ async def schedule_endpoint(query: str = None, db: Session = Depends(get_db)):
     return response
 
 
-@app.get("/different-buildings")
+@app.get("/different-buildings_2")
 async def different_buildings_endpoint(query: str = None, db: Session = Depends(get_db)):
     # Проверяем, был ли выполнен такой запрос ранее
     history = get_history_by_text(db, query)
@@ -158,24 +163,12 @@ async def different_buildings_endpoint(query: str = None, db: Session = Depends(
                             "buildings": list(
                                 set(event.location[event.location.find("(") + 1:-1] for event in db.events)),
                             "events_by_building": [{list(
-                                set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]: [event
-                                                                                                                  for
-                                                                                                                  event
-                                                                                                                  in
-                                                                                                                  db.events
-                                                                                                                  if
-                                                                                                                  list(
-                                                                                                                      set(
-                                                                                                                          event.location[
-                                                                                                                          event.location.find(
-                                                                                                                              "(") + 1:-1]
-                                                                                                                          for
-                                                                                                                          event
-                                                                                                                          in
-                                                                                                                          db.events))[
-                                                                                                                      i] in event.location]}
-                                                   for i in range(len(list(
-                                    set(event.location[event.location.find("(") + 1:-1] for event in db.events))))]
+                                set(event.location[event.location.find("(") + 1:-1] for event in db.events))[i]:
+                                    [event for event in db.events if
+                                     list(set(event.location[event.location.find("(") + 1:-1]
+                                            for event in db.events))[i] in event.location]}
+                                            for i in range(len(list(set(event.location[event.location.find("(") + 1:-1]
+                                            for event in db.events))))]
                         }
                         for db in different_buildings
                     ]
@@ -192,7 +185,6 @@ async def different_buildings_endpoint(query: str = None, db: Session = Depends(
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
-        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
@@ -217,7 +209,7 @@ async def different_buildings_endpoint(query: str = None, db: Session = Depends(
     return await get_different_buildings(query)
 
 
-@app.get("/long-breaks")
+@app.get("/long-breaks_2")
 async def long_breaks_endpoint(query: str = None, db: Session = Depends(get_db)):
     # Проверяем, был ли выполнен такой запрос ранее
     history = get_history_by_text(db, query)
@@ -255,7 +247,6 @@ async def long_breaks_endpoint(query: str = None, db: Session = Depends(get_db))
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
-        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
@@ -280,7 +271,7 @@ async def long_breaks_endpoint(query: str = None, db: Session = Depends(get_db))
     return await get_long_breaks(query)
 
 
-@app.get("/short-breaks-different-campus")
+@app.get("/short-breaks-different-campus_2")
 async def short_breaks_different_campus_endpoint(query: str = None, db: Session = Depends(get_db)):
     # Проверяем, был ли выполнен такой запрос ранее
     history = get_history_by_text(db, query)
@@ -319,7 +310,6 @@ async def short_breaks_different_campus_endpoint(query: str = None, db: Session 
     # Сохраняем группы и связываем их с историей
     for data in response:
         calname = list(data.keys())[0]
-        print(calname)
         group = add_group(db, calname)
         history_group = HistoryHasGroup(history_id=history.id, group_id=group.id)
         db.add(history_group)
@@ -344,36 +334,45 @@ async def short_breaks_different_campus_endpoint(query: str = None, db: Session 
     return await get_short_breaks_different_campus(query)
 
 
-async def process_request(query: str, request_id: int):
+async def process_request(query: str, request_id: int, request_type: str):
     """Фоновая обработка запроса."""
     try:
-        # Получаем результат (предполагаем, что get_schedule — async)
-        result = await get_schedule(query)
+        # Определяем, какую функцию вызвать
+        if request_type == "schedule":
+            result = await get_schedule(query)
+        elif request_type == "different-buildings":
+            result = await get_different_buildings(query)
+        elif request_type == "long-breaks":
+            result = await get_long_breaks(query)
+        elif request_type == "short-breaks-different-campus":
+            result = await get_short_breaks_different_campus(query)
+        else:
+            raise ValueError(f"Unknown request type: {request_type}")
 
-        # Функция для сериализации в JSON-совместимый формат
+        # Функция для сериализации объектов в JSON
         def to_dict(obj):
             if isinstance(obj, list):
                 return [to_dict(item) for item in obj]
             elif isinstance(obj, dict):
                 return {key: to_dict(value) for key, value in obj.items()}
-            elif hasattr(obj, 'to_dict'):  # Если есть метод `to_dict()`
+            elif hasattr(obj, 'to_dict'):  # Если есть метод to_dict()
                 return obj.to_dict()
-            elif hasattr(obj, '__dict__'):  # Если это объект класса (SQLAlchemy)
+            elif hasattr(obj, '__dict__'):  # SQLAlchemy-объект
                 return {key: to_dict(value) for key, value in obj.__dict__.items() if not key.startswith('_')}
-            elif isinstance(obj, datetime):  # Даты сериализуем в строку
+            elif isinstance(obj, datetime):
                 return obj.isoformat()
             else:
                 return obj
 
-        result_dict = [event.dict() if hasattr(event, 'dict') else to_dict(event) for event in result]
-
+        # Сериализуем результат
+        result_dict = to_dict(result)
 
         # Открываем новую сессию БД
         with next(get_db()) as db:
             request_status = db.query(RequestStatus).filter(RequestStatus.id == request_id).first()
             if request_status:
                 request_status.status = "completed"
-                request_status.result = json.dumps(result_dict)  # Сериализуем в JSON
+                request_status.result = json.dumps(result_dict)  # Сохраняем результат как JSON-строку
                 db.commit()
             else:
                 print(f"Request {request_id} not found.")
@@ -391,7 +390,8 @@ class RequestCreate(BaseModel):
     query: str
 
 
-@app.post("/schedule")
+# level 3
+@app.post("/schedule_3")
 async def schedule_endpoint(request: RequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Создает новый запрос и запускает обработку в фоне."""
     request_status = RequestStatus(query_text=request.query, status="in_progress")
@@ -399,8 +399,50 @@ async def schedule_endpoint(request: RequestCreate, background_tasks: Background
     db.commit()
     db.refresh(request_status)
 
-    # Запускаем фоновую задачу через asyncio.create_task()
-    background_tasks.add_task(process_request, request.query, request_status.id)
+    # Запускаем фоновую задачу
+    background_tasks.add_task(process_request, request.query, request_status.id, "schedule")
+
+    return {"request_id": request_status.id}
+
+
+@app.post("/different-buildings_3")
+async def different_buildings_endpoint(request: RequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Создает новый запрос для разных зданий и запускает обработку в фоне."""
+    request_status = RequestStatus(query_text=request.query, status="in_progress")
+    db.add(request_status)
+    db.commit()
+    db.refresh(request_status)
+
+    # Запускаем фоновую задачу
+    background_tasks.add_task(process_request, request.query, request_status.id, "different-buildings")
+
+    return {"request_id": request_status.id}
+
+
+@app.post("/long-breaks_3")
+async def long_breaks_endpoint(request: RequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Создает новый запрос для длинных перерывов и запускает обработку в фоне."""
+    request_status = RequestStatus(query_text=request.query, status="in_progress")
+    db.add(request_status)
+    db.commit()
+    db.refresh(request_status)
+
+    # Запускаем фоновую задачу
+    background_tasks.add_task(process_request, request.query, request_status.id, "long-breaks")
+
+    return {"request_id": request_status.id}
+
+
+@app.post("/short-breaks-different-campus_3")
+async def short_breaks_different_campus_endpoint(request: RequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Создает новый запрос для коротких перерывов на разных кампусах и запускает обработку в фоне."""
+    request_status = RequestStatus(query_text=request.query, status="in_progress")
+    db.add(request_status)
+    db.commit()
+    db.refresh(request_status)
+
+    # Запускаем фоновую задачу
+    background_tasks.add_task(process_request, request.query, request_status.id, "short-breaks-different-campus")
 
     return {"request_id": request_status.id}
 
