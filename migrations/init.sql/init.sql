@@ -87,3 +87,10 @@ CREATE TABLE events_sb (
     short_breaks_id INT REFERENCES short_breaks(id) ON DELETE CASCADE,
     short_breaks_groups_id INT REFERENCES groups(id) ON DELETE CASCADE
 );
+
+CREATE TABLE request_status (
+    id SERIAL PRIMARY KEY,
+    query_text TEXT NOT NULL,
+    status VARCHAR(50) DEFAULT 'in_progress' NOT NULL,
+    result JSONB NULL
+);
